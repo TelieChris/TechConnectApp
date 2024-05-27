@@ -1,37 +1,44 @@
 pipeline {
     agent any
-    tools{
-        maven 'maven_3_5_0'
+
+    tools {
+        // Install the Maven version configured as "Maven" and add it to the path.
+        maven "Maven"
     }
-    stages{
-        stage('Build Maven'){
-            steps{
-                checkout([$class: 'GitSCM', branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/Java-Techie-jt/devops-automation']]])
-                sh 'mvn clean install'
+
+    stages {
+        stage('Build Maven') {
+            steps {
+                checkout([
+                    $class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    extensions: [],
+                    userRemoteConfigs: [[
+                        url: 'https://github.com/TelieChris/TechConnectApp',
+                        credentialsId: '89d5394e-ea16-48ab-bbaa-e898817b1738' // Replace with your actual credentials ID
+                    ]]
+                ])
+                bat 'mvn clean install'
             }
         }
         stage('Build docker image'){
             steps{
                 script{
-                    sh 'docker build -t javatechie/devops-integration .'
+                    bat 'docker build -t techconnect .'
                 }
             }
         }
-        stage('Push image to Hub'){
+        stage('Push image to Docker Hub'){
             steps{
-                script{
-                   withCredentials([string(credentialsId: 'dockerhub-pwd', variable: 'dockerhubpwd')]) {
-                   sh 'docker login -u javatechie -p ${dockerhubpwd}'
-
-}
-                   sh 'docker push javatechie/devops-integration'
-                }
-            }
-        }
-        stage('Deploy to k8s'){
-            steps{
-                script{
-                    kubernetesDeploy (configs: 'deploymentservice.yaml',kubeconfigId: 'k8sconfigpwd')
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'DockerHubCredentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                        bat '''
+                            echo %DOCKER_PASSWORD% | docker login -u %DOCKER_USERNAME% -p %DOCKER_PASSWORD% 
+                        '''
+                    }
+                    bat 'docker tag techconnect 50604/techconnect:mytag'
+                    bat 'docker login docker.io'
+                    bat 'docker push 50604/techconnect:mytag'
                 }
             }
         }
